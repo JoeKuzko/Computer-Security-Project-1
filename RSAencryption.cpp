@@ -7,15 +7,17 @@
 #include <math.h>
 #include <sstream>
 #include <time.h>
+#include <iomanip>
 #include "BigIntegerLibrary.hh"
+#include "RSAcontext.cpp"
+
 
 using namespace std;
 
 
 //function prototypes
-
 vector<BigUnsigned> getPrime(); // gets prime numbers from generated prime file
-vector<BigUnsigned> select_P_Q_E(vector<BigUnsigned>);// will return vector of primes in this specific order
+RSAConxtext         select_P_Q_E(vector<BigUnsigned>);// will return vector of primes in this specific order
 vector<char>        storeMessage(vector<char>); //Reads plaintext file and puts all characters into vector
 vector<BigUnsigned> getTrigraphCode(char[], vector<BigUnsigned>); //reads every 3 chars and converts to trigraph code
 vector<BigUnsigned> encipher(vector<BigUnsigned>, BigUnsigned, BigUnsigned);// enciphers trigraph code
@@ -25,10 +27,19 @@ vector<BigUnsigned> decipher(vector<BigUnsigned>, BigUnsigned, BigUnsigned); // 
 vector<char>        orgPlaintext(vector<BigUnsigned>); // converts deciphered code into the orginal plaintext
 
 
+
+    
+    
+    
+    
+	
+
+	
+
 //Main program method
 int main(){
-    vector<BigUnsigned>    primes;
-    vector<BigUnsigned>    PQE;
+    vector<BigUnsigned>    primes;            //a list of primes read from an existing file
+    RSAConxtext            PQE;               //RSA p q and e data structure
     vector<char>           plaintext;
     vector<char>           ciphertext;
     vector<BigUnsigned>    trigraph_code;
@@ -41,15 +52,11 @@ int main(){
     if (primes.empty()) {
         return 9999;
     }
+	
+	
+    //PQE = select_P_Q_E(primes); // prime numbers selected for p,q,e
 
-    PQE = select_P_Q_E(primes); // prime numbers selected for p,q,e
 
-    BigUnsigned p = PQE[0];
-    BigUnsigned q = PQE[1];
-    BigUnsigned n = p*q ; // modulus
-    BigUnsigned totient = (p - 1)* (q - 1); // phi n
-    BigUnsigned e = PQE[2]; // encryption key
-    BigUnsigned d = modinv(e, totient); // decryption key
 
     plaintext = storeMessage(plaintext); // reads file for plaintext and stores in plaintext vector
 
@@ -78,11 +85,11 @@ int main(){
         C = C + 3;
     }
     
-    enciphered_code = encipher(trigraph_code, e, n);
+    //enciphered_code = encipher(trigraph_code, e, n);
     codeToText(enciphered_code);
 
     cipher_code = textToCode();
-    deciphered_code = decipher(cipher_code, d, n);
+    //deciphered_code = decipher(cipher_code, d, n);
     original_message = orgPlaintext(deciphered_code);
 
     ofstream outFile("plaintext-recieved.txt");
@@ -108,7 +115,7 @@ vector<BigUnsigned> getPrime() {
 	string c; // for getting a prime in file
 
 	while (inputFile) {
-		inputFile >> c;// read a block of text from the file
+		inputFile >> c;
 		primes.push_back(stringToBigUnsigned(c));
 		//cout << "prime : " << primes.size() << " [ " << primes[0] << endl;
     }
@@ -119,14 +126,14 @@ vector<BigUnsigned> getPrime() {
 }
 
 //function to select prime numbers for p,q,e
-vector<BigUnsigned> select_P_Q_E(vector<BigUnsigned> prime_numbers) {
-    vector<BigUnsigned> PQE;
+RSAConxtext select_P_Q_E(vector<BigUnsigned> prime_numbers) {
+    RSAConxtext PQE;
     int x, y, z;//element holders
     int flag = 0;
     while (flag == 0) {
-        printf("please input element number 0-998 for prime p \n");
+        printf("please input element number 0-999 for prime p \n");
         cin >> x;
-        printf("please input element number 0-998 for prime q that is not equal to p: \n");
+        printf("please input element number 0-999 for prime q that is not equal to p: \n");
         cin >> y;
         printf("please input element number for e that is not equal to p or q \n");
         cin >> z;
@@ -141,9 +148,9 @@ vector<BigUnsigned> select_P_Q_E(vector<BigUnsigned> prime_numbers) {
             cout << "numbers for input do not follow parameters \n";
         }
     }
-    PQE.push_back(prime_numbers[x]);
-    PQE.push_back(prime_numbers[y]);
-    PQE.push_back(prime_numbers[z]);
+    PQE.setP(prime_numbers[x]);
+    PQE.setQ(prime_numbers[y]);
+    PQE.sete(prime_numbers[z]);
     return PQE;
 }
 
