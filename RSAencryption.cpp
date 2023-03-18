@@ -100,19 +100,20 @@ vector<BigUnsigned> getPrime() {
     ifstream inputFile("primes-sorted.dat");
     if (inputFile.is_open() == false) {
         printf("file primes-sorted.dat failed to open");
+		printf("please run prime generation");
         return primes;
     }
-    string c; // for getting line in file
-    while (getline(inputFile, c)) {
-        string final_num = "";
-        for (int i = 0; i < c.size(); i++) {
-            if (c[i] != ' ') {
-                final_num = final_num + c[i];
-            }
-        }
-        BigUnsigned prime = stringToBigUnsigned(final_num);
-        primes.push_back(prime);
+    
+	cout << "loading primes from file" << endl;
+	string c; // for getting a prime in file
+
+	while (inputFile) {
+		inputFile >> c;// read a block of text from the file
+		primes.push_back(stringToBigUnsigned(c));
+		//cout << "prime : " << primes.size() << " [ " << primes[0] << endl;
     }
+	
+	cout << "loaded [ " << primes.size() << " ] primes from file" << endl;
     inputFile.close();
     return primes;
 }
