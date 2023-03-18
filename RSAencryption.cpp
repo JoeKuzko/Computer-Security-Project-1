@@ -11,6 +11,9 @@
 #include "BigIntegerLibrary.hh"
 #include "RSAcontext.cpp"
 
+const int BLOCKREADSIZE  = 2; //m < n -- Computer Security Practices and Principles
+const int BLOCKWRITESIZE = 3; // 10^200 *10^ 200 = 10^400. This represents the biggest possible 
+
 
 using namespace std;
 
@@ -18,7 +21,7 @@ using namespace std;
 //function prototypes
 vector<BigUnsigned> getPrime(); // gets prime numbers from generated prime file
 RSAConxtext         select_P_Q_E(vector<BigUnsigned>);// will return vector of primes in this specific order
-vector<char>        storeMessage(vector<char>); //Reads plaintext file and puts all characters into vector
+vector<char>        getMessageFromFile(); //Reads plaintext file and puts all characters into vector
 vector<BigUnsigned> getTrigraphCode(char[], vector<BigUnsigned>); //reads every 3 chars and converts to trigraph code
 vector<BigUnsigned> encipher(vector<BigUnsigned>, BigUnsigned, BigUnsigned);// enciphers trigraph code
 void                codeToText(vector<BigUnsigned>); // takes the enciphered code and splits it up into ascii and creates file
@@ -54,23 +57,10 @@ int main(){
     }
 	
 	
-    //PQE = select_P_Q_E(primes); // prime numbers selected for p,q,e
+    PQE = select_P_Q_E(primes); // prime numbers selected for p,q,e
+    plaintext = getMessageFromFile(); // reads file for plaintext and stores in plaintext vector
 
-
-
-    plaintext = storeMessage(plaintext); // reads file for plaintext and stores in plaintext vector
-
-    //Iterate through the plaintext vector to calculate and place in padding
-    int size = plaintext.size();
-    int numPadding = 0;
-    if(size % 3 != 0){
-        numPadding = 3 - (size % 3);
-        int i = 0;
-        while(i < numPadding){
-            plaintext.push_back('\0');
-            i++;
-        }
-    }
+    
 
     //creating trigraph and recieving trigraph code
     //kept plan of splitting message into blocks of 3 chars each
@@ -155,17 +145,31 @@ RSAConxtext select_P_Q_E(vector<BigUnsigned> prime_numbers) {
 }
 
 //Function to store the input file into a vector of strings
-vector<char> storeMessage(vector<char> trigraph){
+vector<char> getMessageFromFile(){
 
+    vector<char> plaintext;
     ifstream inputFile("plaintext-sent.txt");
 
     char c;
     while(inputFile.get(c)){
-        trigraph.push_back(c);
+        plaintext.push_back(c);
     }
   
     inputFile.close();
-    return trigraph;
+
+    //Iterate through the plaintext vector to calculate and place in padding
+    
+    int numPadding = 0;
+    if(plaintext.size() % 3 != 0){
+        numPadding = BLOCKREADSIZE - (plaintext.size() % BLOCKREADSIZE);
+        int i = 0;
+        while(i < numPadding){
+            plaintext.push_back('\0');
+            i++;
+        }
+    }
+
+    return plaintext;
 }
 
 //Function to convert plaintext trigraphs into trigraph code
