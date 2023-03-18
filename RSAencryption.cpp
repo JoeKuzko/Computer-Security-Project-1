@@ -7,16 +7,21 @@
 #include <math.h>
 #include <sstream>
 #include <time.h>
+#include <iomanip>
 #include "BigIntegerLibrary.hh"
+#include "RSAcontext.cpp"
+
+const int BLOCKREADSIZE  = 2; //m < n -- Computer Security Practices and Principles
+const int BLOCKWRITESIZE = 3; // 10^200 *10^ 200 = 10^400. This represents the biggest possible 
+
 
 using namespace std;
 
 
 //function prototypes
-
 vector<BigUnsigned> getPrime(); // gets prime numbers from generated prime file
-vector<BigUnsigned> select_P_Q_E(vector<BigUnsigned>);// will return vector of primes in this specific order
-vector<char>        storeMessage(vector<char>); //Reads plaintext file and puts all characters into vector
+RSAConxtext         select_P_Q_E(vector<BigUnsigned>);// will return vector of primes in this specific order
+vector<char>        getMessageFromFile(); //Reads plaintext file and puts all characters into vector
 vector<BigUnsigned> getTrigraphCode(char[], vector<BigUnsigned>); //reads every 3 chars and converts to trigraph code
 vector<BigUnsigned> encipher(vector<BigUnsigned>, BigUnsigned, BigUnsigned);// enciphers trigraph code
 void                codeToText(vector<BigUnsigned>); // takes the enciphered code and splits it up into ascii and creates file
@@ -25,10 +30,19 @@ vector<BigUnsigned> decipher(vector<BigUnsigned>, BigUnsigned, BigUnsigned); // 
 vector<char>        orgPlaintext(vector<BigUnsigned>); // converts deciphered code into the orginal plaintext
 
 
+
+    
+    
+    
+    
+	
+
+	
+
 //Main program method
 int main(){
-    vector<BigUnsigned>    primes;
-    vector<BigUnsigned>    PQE;
+    vector<BigUnsigned>    primes;            //a list of primes read from an existing file
+    RSAConxtext            PQE;               //RSA p q and e data structure
     vector<char>           plaintext;
     vector<char>           ciphertext;
     vector<BigUnsigned>    trigraph_code;
@@ -41,29 +55,12 @@ int main(){
     if (primes.empty()) {
         return 9999;
     }
-
+	
+	
     PQE = select_P_Q_E(primes); // prime numbers selected for p,q,e
+    plaintext = getMessageFromFile(); // reads file for plaintext and stores in plaintext vector
 
-    BigUnsigned p = PQE[0];
-    BigUnsigned q = PQE[1];
-    BigUnsigned n = p*q ; // modulus
-    BigUnsigned totient = (p - 1)* (q - 1); // phi n
-    BigUnsigned e = PQE[2]; // encryption key
-    BigUnsigned d = modinv(e, totient); // decryption key
-
-    plaintext = storeMessage(plaintext); // reads file for plaintext and stores in plaintext vector
-
-    //Iterate through the plaintext vector to calculate and place in padding
-    int size = plaintext.size();
-    int numPadding = 0;
-    if(size % 3 != 0){
-        numPadding = 3 - (size % 3);
-        int i = 0;
-        while(i < numPadding){
-            plaintext.push_back('\0');
-            i++;
-        }
-    }
+    
 
     //creating trigraph and recieving trigraph code
     //kept plan of splitting message into blocks of 3 chars each
@@ -78,11 +75,11 @@ int main(){
         C = C + 3;
     }
     
-    enciphered_code = encipher(trigraph_code, e, n);
+    //enciphered_code = encipher(trigraph_code, e, n);
     codeToText(enciphered_code);
 
     cipher_code = textToCode();
-    deciphered_code = decipher(cipher_code, d, n);
+    //deciphered_code = decipher(cipher_code, d, n);
     original_message = orgPlaintext(deciphered_code);
 
     ofstream outFile("plaintext-recieved.txt");
@@ -100,32 +97,33 @@ vector<BigUnsigned> getPrime() {
     ifstream inputFile("primes-sorted.dat");
     if (inputFile.is_open() == false) {
         printf("file primes-sorted.dat failed to open");
+		printf("please run prime generation");
         return primes;
     }
-    string c; // for getting line in file
-    while (getline(inputFile, c)) {
-        string final_num = "";
-        for (int i = 0; i < c.size(); i++) {
-            if (c[i] != ' ') {
-                final_num = final_num + c[i];
-            }
-        }
-        BigUnsigned prime = stringToBigUnsigned(final_num);
-        primes.push_back(prime);
+    
+	cout << "loading primes from file" << endl;
+	string c; // for getting a prime in file
+
+	while (inputFile) {
+		inputFile >> c;
+		primes.push_back(stringToBigUnsigned(c));
+		//cout << "prime : " << primes.size() << " [ " << primes[0] << endl;
     }
+	
+	cout << "loaded [ " << primes.size() << " ] primes from file" << endl;
     inputFile.close();
     return primes;
 }
 
 //function to select prime numbers for p,q,e
-vector<BigUnsigned> select_P_Q_E(vector<BigUnsigned> prime_numbers) {
-    vector<BigUnsigned> PQE;
+RSAConxtext select_P_Q_E(vector<BigUnsigned> prime_numbers) {
+    RSAConxtext PQE;
     int x, y, z;//element holders
     int flag = 0;
     while (flag == 0) {
-        printf("please input element number 0-998 for prime p \n");
+        printf("please input element number 0-999 for prime p \n");
         cin >> x;
-        printf("please input element number 0-998 for prime q that is not equal to p: \n");
+        printf("please input element number 0-999 for prime q that is not equal to p: \n");
         cin >> y;
         printf("please input element number for e that is not equal to p or q \n");
         cin >> z;
@@ -140,24 +138,38 @@ vector<BigUnsigned> select_P_Q_E(vector<BigUnsigned> prime_numbers) {
             cout << "numbers for input do not follow parameters \n";
         }
     }
-    PQE.push_back(prime_numbers[x]);
-    PQE.push_back(prime_numbers[y]);
-    PQE.push_back(prime_numbers[z]);
+    PQE.setP(prime_numbers[x]);
+    PQE.setQ(prime_numbers[y]);
+    PQE.sete(prime_numbers[z]);
     return PQE;
 }
 
 //Function to store the input file into a vector of strings
-vector<char> storeMessage(vector<char> trigraph){
+vector<char> getMessageFromFile(){
 
+    vector<char> plaintext;
     ifstream inputFile("plaintext-sent.txt");
 
     char c;
     while(inputFile.get(c)){
-        trigraph.push_back(c);
+        plaintext.push_back(c);
     }
   
     inputFile.close();
-    return trigraph;
+
+    //Iterate through the plaintext vector to calculate and place in padding
+    
+    int numPadding = 0;
+    if(plaintext.size() % 3 != 0){
+        numPadding = BLOCKREADSIZE - (plaintext.size() % BLOCKREADSIZE);
+        int i = 0;
+        while(i < numPadding){
+            plaintext.push_back('\0');
+            i++;
+        }
+    }
+
+    return plaintext;
 }
 
 //Function to convert plaintext trigraphs into trigraph code
