@@ -4,6 +4,8 @@
 
 using namespace std;
 
+
+
 //a structure of data and functions to work on it.
 class RSAConxtext{
 	private: BigUnsigned p;//a large prime p
@@ -26,7 +28,7 @@ class RSAConxtext{
 	
 	public: bool setP(BigUnsigned primeP){
 		//error checking
-		if(p==q){
+		if(primeP == q){
 			cout << "RSAConxtext.setP primes are the same: throwing error" << endl;
 			throw "RSAConxtext.setP primes are the same: aborting program";
 		}
@@ -41,7 +43,7 @@ class RSAConxtext{
 	
 	public: bool setQ(BigUnsigned primeQ){
 		//error checking
-		if(p==q){
+		if(p == primeQ){
 			cout << "RSAConxtext.setQ primes are the same: throwing error" << endl;
 			throw "RSAConxtext.setQ primes are the same: aborting program";
 		}
@@ -92,8 +94,25 @@ class RSAConxtext{
 		cout << "v phi n: [ " << setw(203) <<  totient<< endl;
 		cout << "var   e: [ " << setw(203) << e << endl;
 		cout << "var   d: [ " << setw(203) << d<< endl;
-		cout << "var    : [ " << setw(203) <<  endl;
+		//cout << "var    : [ " << setw(203) <<  endl;
 		cout << endl;
-	
 	}
+
+	public: BigUnsigned encryptBlock(BigUnsigned plainTextBlock){
+		if(hasChanged)
+			recalculate();
+		return modexp(plainTextBlock, p, n);
+	}
+
+	public: BigUnsigned decryptBlock(BigUnsigned cipherTextBlock){
+		if(hasChanged)
+			recalculate();
+		return modexp(cipherTextBlock, q, n);
+	}
+
+	
+
+
+
+
 };
