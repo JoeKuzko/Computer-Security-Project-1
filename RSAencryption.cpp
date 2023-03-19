@@ -65,9 +65,9 @@ int main(){
     //decryptMessage(plaintext, PQE);
     cout << "!!!decrypt testing disable to work on timing" << endl;
 
-    testPrimeLengthTiming(plaintext, primes);
+    //testPrimeLengthTiming(plaintext, primes);
     //cout << "!!!Prime Length testing disabled to work on timing" << endl;
-    //testMessageLengthTiming(plaintext, primes);
+    testMessageLengthTiming(plaintext, primes);
 
     /*
     //enciphered_code = encipher(trigraph_code, e, n);
@@ -401,6 +401,109 @@ unsigned getLengthInBits (BigUnsigned input){
 }
 
 //
+void testMessageLengthTiming(vector<char> message, vector<BigUnsigned> primes){
+    int testRounds = 1200;
+    int seed = 665;
+    srand(seed);
+    string msg;
+    const string filename= "testMsgLengthTiming.csv";
+    ofstream outFile(filename);
+    RSAConxtext RSA;
+    BigUnsigned msgBase10;
+    Timer clock;
+    Timer totalTime;
+    totalTime.reset();
+
+    double encryptionTime;
+    double decryptionTime;
+    BigUnsigned preLoadedCipher;
+    for(int i =0; i< message.size(); i++){
+        msg.append(1,message[i]);
+    }
+
+
+    cout << "testing message length timing "<< endl;
+    cout << "doing [ " << testRounds << " ] rounds" << endl;
+    cout << "using random seed [ " << seed << endl;
+    
+
+    while (!RSA.setP(primes.at(rand() % primes.size())))
+        ; // nop to keep drawing
+
+    while (!RSA.setQ(primes.at(rand() % primes.size())))
+        ; // nop to keep drawing
+
+    BigUnsigned e;
+    do
+    {
+        // cout << "setting e" << endl;
+        e = (unsigned)rand() | 3;
+    } while (!RSA.sete(e));
+
+    RSA.printContext();
+
+    cout << "setting fileheader" << endl;
+
+    outFile << "prime one length (bin digits), " << getLengthInBits(RSA.getP()) << endl;
+    outFile << "prime two length (bin digits), " << getLengthInBits(RSA.getQ()) << endl;
+    outFile << "modulus - n length (bin Digits), " << getLengthInBits(RSA.getn()) << endl;
+    outFile << "phi(n) length (bin digits), " << getLengthInBits(RSA.getphin()) << endl;
+    outFile << "random seed used, " << seed << endl;
+
+    outFile << "message length (bin digits), encryption time (seconds), decryption time (seconds)" << endl;
+
+    
+
+    for (int i = 0; i < testRounds; i++)
+    {
+        string testMessage;
+        unsigned messageRoundSize;
+        unsigned messageRoundOffset;
+        do{
+            messageRoundSize = (rand() % PLAINTEXTREADSIZE) ;
+            messageRoundOffset = (rand() % PLAINTEXTREADSIZE) ;
+        }while (!messageRoundSize && messageRoundOffset + messageRoundSize >= msg.size());
+            
+        for(int i =0; i < messageRoundSize; i ++){
+            testMessage.append(1,msg[i+messageRoundOffset]);
+        }
+        msgBase10 = convertCharsToBigUnsigned(testMessage);
+
+        preLoadedCipher = RSA.encryptBlock(msgBase10); // we want to remove memory allocation time from the test
+        unsigned reportAfterRound = testRounds/10;
+        if (!(i%reportAfterRound))
+        {
+            //
+            cout << "timer since start [ " << totalTime.elapsed() << " ] on test round [ " << i << endl;
+        }
+
+        clock.reset();
+        RSA.encryptBlock(msgBase10);
+        encryptionTime = clock.elapsed();
+
+        clock.reset();
+        RSA.decryptBlock(preLoadedCipher);
+        decryptionTime = clock.elapsed();
+
+        /*
+        outFile << getLengthInBits(RSA.getP()) << ", " << getLengthInBits(RSA.getQ()) << ", ";
+        outFile << getLengthInBits(RSA.getn()) << ", " << getLengthInBits(RSA.getphin()) << ",";
+        */
+
+        outFile << testMessage.size() << ", " << encryptionTime << ", " << decryptionTime << endl;
+    }
+    outFile.close();
+
+    cout << "testing done. " << endl;
+    cout << "total elapsed time [ " << totalTime.elapsed() << endl;
+    cout << "results located in " << filename << endl;
+
+    return;
+
+
+}
+
+//
 void testPrimeLengthTiming(vector<char> message, vector<BigUnsigned>primes){
     int testRounds = 2500;
     int seed = 665;
@@ -482,7 +585,7 @@ void testPrimeLengthTiming(vector<char> message, vector<BigUnsigned>primes){
     outFile.close();
 
     cout << "testing done. " << endl;
-    cout << "total elapsed time [ " << totalTime.elapsed();
+    cout << "total elapsed time [ " << totalTime.elapsed() << endl;
     cout << "results located in " << filename << endl;
 
     return;
