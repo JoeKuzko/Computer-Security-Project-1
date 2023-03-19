@@ -4,7 +4,7 @@ all: RSAencryption
 #RSAencryption is the program to encrpyt / decrypt primes.
 #to-do add BigIntLib makefile dependency
 RSAencryption: RSAencryption.cpp 
-	g++ -std=c++11 -g -w -Wall RSAencryption.cpp BigInteger.o BigIntegerAlgorithms.o BigIntegerUtils.o BigUnsigned.o BigUnsignedInABase.o -o RSAencryption
+	g++ -std=c++11 -w -Wall RSAencryption.cpp BigInteger.o BigIntegerAlgorithms.o BigIntegerUtils.o BigUnsigned.o BigUnsignedInABase.o -o RSAencryption
 
 		
 #program to fiddle with stuff -- not for public consumption
