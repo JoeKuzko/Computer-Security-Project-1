@@ -3,18 +3,22 @@
 #include <fstream>
 #include <vector>
 #include <string>
-//#include <string.h>
+#include <string.h>
 #include <cstddef>
 #include <math.h>
 #include <sstream>
 #include <time.h>
 #include <iomanip>
-#include "BigIntegerLibrary.hh"
 #include <chrono>
-#include "RSAcontext.cpp"
-#include "timer.cpp"
+#include <time.h>
+
+#include "BigIntegerLibrary.hh"   //this external library handles big unsigned integers for us
+#include "timer.cpp"              //this external library handles test timing for us
+#include "RSAcontext.cpp"         //written by us, it holds the structure of information for RSA encryption and methods to do it
+
 
 const int PLAINTEXTREADSIZE  = 200; //m < n -- Computer Security Practices and Principles
+                                    //prime generation happens in another process, and the file of primes are required before running this program
                                     //the two lowest primes are ~10^100. 10 ^200 in base 8 is around 226 octal digits
 const int BLOCKWRITESIZE = 450;     // 10^200 *10^ 200 = 10^402. 10^402 in base 8 is around 446 octal digits. 
 
@@ -32,25 +36,20 @@ BigUnsigned         convertCharsToBigUnsigned(string input);//helper funcion to 
 string              convertBigUnsignedToBase256(BigUnsigned);
 void                testPrimeLengthTiming(vector<char>, vector<BigUnsigned> Primes);
 void                testMessageLengthTiming(vector<char>, vector<BigUnsigned> Primes);
-vector<char>        getBlockAt(vector<char>, int, int); //returns the block at i, seperated by blockSize
-string              to_string(vector<char> msg){ string m; for(int i =0; i < msg.size(); i++) m.append(1,msg[i]); return m;}
+
+string inline       to_string(vector<char> msg){ string m; for(int i =0; i < msg.size(); i++) m.append(1,msg[i]); return m;}//inline function to convert a char vector and returns a string
     
-
-
-    
-	
-
-	
 
 //Main program method
 int main(){
-    vector<BigUnsigned>    primes;            //a list of primes read from an existing file
-    RSAConxtext            PQE;               //RSA p q and e data structure
-    vector<char>           plaintext;
-    vector<char>           ciphertext;
+    srand(time(0));                          //seed the time for random selections later
+    vector<BigUnsigned>    primes;           //a list of primes read from an existing file
+    RSAConxtext            PQE;              //RSA p q and e data structure
+    vector<char>           plaintext;        //a vector of plaintext characters read from the file
     
     
-
+    
+    //primes are generated from primegeneration process and stroed in a file. Source code is available in primegeneration.cc
     primes = getPrime(); // all prime numbers from file have been recieved
     if (primes.empty()) {
         return 9999;
@@ -60,37 +59,22 @@ int main(){
     PQE = select_P_Q_E(primes); // prime numbers selected for p,q,e
     plaintext = getMessageFromFile(); // reads file for plaintext and stores in plaintext vector
 
-    //encryptMessage(plaintext,PQE); //write encrypt to file.
-    cout << "!!!encryptMessage disabled to work on Decrypt" << endl;
-    //decryptMessage(plaintext, PQE);
-    cout << "!!!decrypt testing disable to work on timing" << endl;
-
-    //testPrimeLengthTiming(plaintext, primes);
-    //cout << "!!!Prime Length testing disabled to work on timing" << endl;
-    testMessageLengthTiming(plaintext, primes);
-
-    /*
-    //enciphered_code = encipher(trigraph_code, e, n);
-    //codeToText(enciphered_code);
-
-    //cipher_code = textToCode();
-    //deciphered_code = decipher(cipher_code, d, n);
-    original_message = orgPlaintext(deciphered_code);
-
-    ofstream outFile("plaintext-recieved.txt");
-    for (int i = 0; i < original_message.size(); i++) {
-        outFile << original_message[i];
-    }
-    outFile.close();
-    */
+    encryptMessage(plaintext,PQE); //write encrypt to file.
+    decryptMessage(plaintext, PQE);//reads from the file and decrypts
+    
+    testPrimeLengthTiming(plaintext, primes);//runs test suite for prime length timing
+    testMessageLengthTiming(plaintext, primes);//runs test suite for message length timing
 
     return 0;
 }
 
-//function to get prime numbers from file. 
+/// @brief Attempts to read primes-sorted.dat file and store them into a vector of big unsigned. It does not check for primeness
+/// @return a vector of numbers read from file
 vector<BigUnsigned> getPrime() {
-    vector<BigUnsigned> primes;
-    ifstream inputFile("primes-sorted.dat");
+    
+    vector<BigUnsigned> primes;                       //location to store primes
+    ifstream inputFile("primes-sorted.dat");          //name of the file for prime storage
+    
     if (inputFile.is_open() == false) {
         printf("file primes-sorted.dat failed to open");
 		printf("please run prime generation");
@@ -98,13 +82,13 @@ vector<BigUnsigned> getPrime() {
     }
     
 	cout << "loading primes from file" << endl;
-	string c; // for getting a prime in file
+	string c;                                         // temp storage for file reads
 
     //while(primes.size() < 20){  //testing memory problems.
-	while (inputFile) {
-		inputFile >> c;
+	//read every entry and convert it to a number to be stored in a bigunsigned variable
+    while (inputFile) {
+        inputFile >> c;
 		primes.push_back(stringToBigUnsigned(c));
-		//cout << "prime : " << primes.size() << " [ " << primes[0] << endl;
     }
 	
 	cout << "loaded [ " << primes.size() << " ] primes from file" << endl;
@@ -112,16 +96,29 @@ vector<BigUnsigned> getPrime() {
     return primes;
 }
 
-//function to select prime numbers for p,q,e
-RSAConxtext select_P_Q_E(vector<BigUnsigned> prime_numbers) {
-    RSAConxtext PQE;
-    int x =1, y =4 , z = 13;//element holders
-    int flag = 0;
+/// @brief fills a [RSAcontext] with random primes and e
+/// @param a pre-checked list of primes
+/// @return a vector of numbers read from file
+RSAConxtext select_P_Q_E(vector<BigUnsigned> primes) {
+    RSAConxtext PQE;  //data structure to hold primes and keys
     
-    cout << "RSA primes using default locations at index 1 and 4 " <<endl;
-    cout << "RSA using e = 13" << endl;
+    // continiuosly draw primes till the RSAContext class accepts them as valid.
+    while (!PQE.setP(primes.at(rand() % primes.size())))
+        ; // nop to keep drawing
+    while (!PQE.setQ(primes.at(rand() % primes.size())))
+        ; // nop to keep drawing
+
+    //fill e with a random number
+    //d is a calcuation from e
+    BigUnsigned e;
+    do
+    {
+        // cout << "setting e" << endl;
+        e = (unsigned)rand() | 3;
+    } while (!PQE.sete(e));
 
     /*
+    //manual prime and e selection process
     while (flag == 0) {
         printf("please input element number 0-999 for prime p \n");
         cin >> x;
@@ -142,235 +139,149 @@ RSAConxtext select_P_Q_E(vector<BigUnsigned> prime_numbers) {
     }
     */
 
-    PQE.setP(prime_numbers[x]);
-    PQE.setQ(prime_numbers[y]);
-    PQE.sete(prime_numbers[z]);
     return PQE;
 }
 
-//Function to store the input file into a vector of strings
+/// @brief reads hard coded file for a message to be encrypted
+/// @return  a vector of all the characters read from the file
 vector<char> getMessageFromFile(){
-
-    vector<char> plaintext;
-    ifstream inputFile("plaintext-sent.txt");
-
+    vector<char> plaintext;                      //the storage for the entire message
+    ifstream inputFile("plaintext-sent.txt");    //file stread to read from
+    
+    cout << "reading plaintext from file" << endl;
+    //grab each character one by one to ensure we don't ignore whitespace or other characters
     char c;
     while(inputFile.get(c)){
         plaintext.push_back(c);
-    }
-  
+    }  
     inputFile.close();
-    cout << "File read [ " << plaintext.size() << " ] characters" << endl;
-    
 
-    //Iterate through the plaintext vector to calculate and place in padding
+    cout << "File read [ " << plaintext.size() << " ] characters" << endl;
+
+    //Iterate through the plaintext vector to calculate and place in padding needed for block encrpytion
     while(plaintext.size() % PLAINTEXTREADSIZE != 0){
         plaintext.push_back(' ');
     }
-
     
     cout << "padding to [ " << plaintext.size() << " ] characters" << endl;
-    //cout << "char size [ " << plaintext.size() <<endl;
-    //cout << to_string(plaintext) << endl;
-    //cout << "======================end file read=============" << endl;
-
     return plaintext;
 }
 
-
-
-//function to turn enciphered code to ascii
-void codeToText(vector<BigUnsigned> ciphercode) {
-    vector<char> ciphertext;
-    for (int i = 0; i < ciphercode.size(); i++) {
-        string temp = bigUnsignedToString(ciphercode[i]);
-        if ((temp.size() % 2) != 0) {
-            temp.insert(0, 1, ' ');
-        }
-        int k = 1;
-        int j = 0;
-        while (k < temp.size()) {
-            string bucket = "";
-            bucket.insert(0,1,temp[j]);
-            bucket = bucket + temp[k];
-            ciphertext.push_back(char(stoi(bucket))+ ' ');
-            j = j+2;
-            k = k+2;
-        }
-        ciphertext.push_back('\n');
-    }
-
-    ofstream outFile("CipherText.txt");
-    for (int i = 0; i < ciphertext.size(); i++) {
-        outFile << ciphertext[i];
-    }
-    outFile.close();
-}
-
-////////////////////////////////////////////////////////
-//function to read and convert plaintext into ciphertext
+/// @brief accepts plain text and writes it (as blocks) to a file
+/// @param plainText the message to be encrypted. It's size should already be padded to a multiple of the block size
+/// @param RSAinfo //the context needed to encrpyt the data
 void encryptMessage(vector<char> plainText, RSAConxtext RSAinfo) {
     int blocksNeeded = (plainText.size() / PLAINTEXTREADSIZE);//integer division to figure out how many blocks
+    string block[blocksNeeded];//trying to use a vector of chars, gives memory allocation errors because of vector's internals
+    ofstream outFile("CipherText.txt");//destination of the plaintextblocks
+
+    //the plaintext should have already been padded
     if( plainText.size() % PLAINTEXTREADSIZE != 0){
         cout << "encryptMessage, plaintext isn't padded correctly, throwing error " << endl;
         throw "encryptMessage, plaintext isn't padded correctly, throwing error ";
     }
-
-    //vector<char> block;
-    ofstream outFile("CipherText.txt");//destination of the plaintextblocks
-    string block[blocksNeeded];//trying to use a vector of chars, gives memory allocation errors because of vector's internals
-    outFile << blocksNeeded << endl;
     
-    for (int i = 0; i < blocksNeeded; i++)
-    {
-        // copy block size into new vector
+    outFile << blocksNeeded << endl;
+    cout << "encrypting message" << endl <<endl;
 
+    //loop through all blocks needed
+    for (int i = 0; i < blocksNeeded; i++)
+    {   
+        //for each block, construct the message
+        cout << "writing block [ " << i << endl;
         for (int j = 0; j < PLAINTEXTREADSIZE; j++)
         {
-            //block.push_back((char)plainText.at((i * PLAINTEXTREADSIZE) + j));
             block[i].append(1,plainText.at((i * PLAINTEXTREADSIZE) + j));
         }
-
-        // this was causing errors because of vector memory allocation
-        // plainTextBlock.clear();// = vector<char>();//empty the last block
-        // plainTextBlock = getBlockAt(plainText,i,PLAINTEXTREADSIZE);
-
-
+        
+        //convert to base 10 and encrypt
         BigUnsigned base10 = convertCharsToBigUnsigned(block[i]);
         base10 = RSAinfo.encryptBlock(base10);
 
+        //padd cipher block character to length -- this adds leading 0s
         string cipherBlock = convertBigUnsignedToBase256(base10);
         while (cipherBlock.size()%BLOCKWRITESIZE != 0)
-            cipherBlock.append(1,' ');
+            cipherBlock.insert(cipherBlock.begin(), (char)0 );
+            //cipherBlock.append(1,' ');
         outFile << cipherBlock;
 
     }
 
+    cout << "file closed"<< endl;
     outFile.close();
     return;
 }
 
 
-/// @brief Look at CipherText.txt and compare decryption results to {paramater} original text
+/// @brief decypts CipherText.txt and compares results to [original text]
 /// @param originalText what the decryption should be
 /// @param RSAinfo modulus and keys for RSA
 void decryptMessage(vector<char> originalText, RSAConxtext RSAinfo) {
     ifstream inFile("Ciphertext.txt",ios::binary);
-    cout << "opening file..." << endl;
     string cipherMessage;
-
+    string plainMessage = to_string(originalText);
     int cipherBlockAmount;
-    inFile >> cipherBlockAmount;//what about the newline characters?
-    
 
-    //cout << "debug : peek [ " << inFile.peek() << endl;
-    //cout << "debug : '\\n' [ " << (int) '\n' << endl;
+    cout << endl << "opening cipher text file..." << endl;
+    inFile >> cipherBlockAmount;//read the amount of cipher blocks we are expected to get     
     inFile.get();//don't leave newline char hanging
-    cout << "debug : peek [ " << inFile.peek() << endl;
+    
 
     for(int i=0; i < cipherBlockAmount * BLOCKWRITESIZE-12; i ++){
     //for(int i=0; i < cipherBlockAmount * BLOCKWRITESIZE; i ++){
         cipherMessage.append(1,inFile.get());
-        
-        /*if(cipherMessage.back() == char_traits<char>::eof())
-        {
-            cout << "decryption hit end of file too early!"<< endl;
-            //inFile.
-        }*/
     }
     
 
-    cout << "reading ciphermessage size [ " << cipherMessage.size() << endl;
+    //cout << "reading ciphermessage size [ " << cipherMessage.size() << endl;
     cout << "reading cipher blocks [ " << cipherBlockAmount << endl;
 
 
+    //decrypte the message block by block
     string cipherBlock;
     for(int i =0; i < cipherBlockAmount; i++){
+        cout << "decryping block [ " << i << endl;
         cipherBlock.clear();
         for(int j =0; j< BLOCKWRITESIZE; j++){
             cipherBlock.append(1,cipherMessage[(i*BLOCKWRITESIZE)+j]);
         }
+
+        //convert the message into base10 that BigUnsigned can use
         BigUnsigned BlockBase10 = convertCharsToBigUnsigned(cipherBlock);
         BlockBase10 = RSAinfo.decryptBlock(BlockBase10);
-        cout << "================== decrypted block " << endl;
-
-        string cipherReveresed;
-        for (int i=cipherBlock.size()-1; i>=0; i--){
-            cipherReveresed.append(1, cipherBlock[i]);
-        }
-        BlockBase10 = convertCharsToBigUnsigned(cipherReveresed);
-        BlockBase10 = RSAinfo.decryptBlock(BlockBase10);
-        cout << "================== reverse decrypted block " << endl;
-
-        cout << convertBigUnsignedToBase256(BlockBase10);
-
+        cipherBlock = convertBigUnsignedToBase256(BlockBase10);
+        cipherMessage.append(cipherBlock);
     }
 
+    if(plainMessage.compare(cipherMessage)){
+        cout << "cipher decryption returned original" << endl;
+    }
+    else
+        cout << "cipher decryption failed" << endl;
 
 }
 
 
-
-
-//Function to decipher the ciphercode 
-vector<BigUnsigned> decipher(vector<BigUnsigned> code, BigUnsigned d, BigUnsigned n){
-    vector<BigUnsigned> deciphered_code;
-    
-    for(int i = 0; i < code.size(); i++){
-        BigUnsigned val = modexp(code[i], d, n);
-        deciphered_code.push_back(val);
-    }
-    
-    return deciphered_code;
-}
-
-//Function to convert deciphered code back to plaintext
-vector<char> orgPlaintext(vector<BigUnsigned> deciphered_code) {
-    vector<char> org_plaintext;
-    for (int i = 0; i < deciphered_code.size(); i++) {
-        BigUnsigned remainder = deciphered_code[i];
-        BigUnsigned quotient;
-        string letter;
-        int number_represent;
-        char character;
-
-        remainder.divideWithRemainder((94*94), quotient);
-        letter = bigUnsignedToString(quotient + int(' '));
-        number_represent = stoi(letter);
-        character = char(number_represent);
-        org_plaintext.push_back(character);
-        remainder.divideWithRemainder((94), quotient);
-        letter = bigUnsignedToString(quotient + int(' '));
-        number_represent = stoi(letter);
-        character = char(number_represent);
-        org_plaintext.push_back(character);
-        letter = bigUnsignedToString(remainder + int(' '));
-        number_represent = stoi(letter);
-        character = char(number_represent);
-        org_plaintext.push_back(character);
-        
-        
-    }
-    return org_plaintext;
-}
-
-
-//helper funcion to convert string of chars (which are base 256) to BigUnsigned
+/// @brief helper funcion to convert string of chars (which are base 256) to BigUnsigned
+/// @param input charater in base 256 to convert to bigunsigned base 10
+/// @return base 10 representation of the input
 BigUnsigned convertCharsToBigUnsigned(string input)
 {
-	BigUnsigned multiple = 1;       //the answer to digit_i = 256^i
+	BigUnsigned multiple = 1;       //multiple = digit_i = 256^i
     BigUnsigned tally = 0;          //total of intermediate addition
 
+    //loop through every character and add to tally
     for(int i= 0; i < input.size(); i++){
         tally += multiple * (unsigned) input.at(i); 
         multiple *= 256;
     }
 
     return tally;
-	
 }
 
-//helper funcion to convert number to chars (which are base 256) 
+/// @brief //helper funcion to convert number to chars (which are base 256) 
+/// @param input a nubumer
+/// @return a base 256 representation of the input
 string convertBigUnsignedToBase256(BigUnsigned input)
 {
 	string text;
@@ -389,6 +300,8 @@ string convertBigUnsignedToBase256(BigUnsigned input)
 	
 }
 
+/// @brief helper function to count the binary digits needed to represent the number
+/// @return amount of binary digits needed for the input
 unsigned getLengthInBits (BigUnsigned input){
     unsigned count = 0;
     while (input>0){
@@ -402,44 +315,34 @@ unsigned getLengthInBits (BigUnsigned input){
 
 //
 void testMessageLengthTiming(vector<char> message, vector<BigUnsigned> primes){
-    int testRounds = 1200;
-    int seed = 665;
+    int testRounds = 40;                                    //how many rounds of testing to do
+    int seed = 665;                                         //a seed for randomness to make testing repeatable
     srand(seed);
-    string msg;
-    const string filename= "testMsgLengthTiming.csv";
-    ofstream outFile(filename);
-    RSAConxtext RSA;
-    BigUnsigned msgBase10;
-    Timer clock;
-    Timer totalTime;
+    string msg;                                             //the plain text message stored as a string
+    const string filename= "testMsgLengthTiming.csv";       //the name of the file to store test results
+    ofstream outFile(filename);                             //the file stream from the [filename]
+    RSAConxtext RSA;                                        //data structure to hold primes and keys during RSA
+    BigUnsigned msgBase10;                                  //plaintext stored in base 10 BigUnsigned format
+    Timer clock;                                            //timer class to measure 
+    Timer totalTime;                                        //timer to measure total for personal reasons
     totalTime.reset();
 
-    double encryptionTime;
-    double decryptionTime;
-    BigUnsigned preLoadedCipher;
+    double encryptionTime;                                  //how long encryption took -- filled by timer class
+    double decryptionTime;                                  //how long decryption took
+    BigUnsigned preLoadedCipher;                            //used to eliminate memory allocation time from encryption trials
+    
+    //read the entire message into a string for formatting reasons
     for(int i =0; i< message.size(); i++){
         msg.append(1,message[i]);
     }
 
 
-    cout << "testing message length timing "<< endl;
+    cout << "testing message length timing "<< endl << endl;
     cout << "doing [ " << testRounds << " ] rounds" << endl;
     cout << "using random seed [ " << seed << endl;
     
-
-    while (!RSA.setP(primes.at(rand() % primes.size())))
-        ; // nop to keep drawing
-
-    while (!RSA.setQ(primes.at(rand() % primes.size())))
-        ; // nop to keep drawing
-
-    BigUnsigned e;
-    do
-    {
-        // cout << "setting e" << endl;
-        e = (unsigned)rand() | 3;
-    } while (!RSA.sete(e));
-
+    //fill RSA information 
+    RSA = select_P_Q_E(primes);
     RSA.printContext();
 
     cout << "setting fileheader" << endl;
@@ -452,44 +355,45 @@ void testMessageLengthTiming(vector<char> message, vector<BigUnsigned> primes){
 
     outFile << "message length (bin digits), encryption time (seconds), decryption time (seconds)" << endl;
 
-    
-
+    //this is the test loop
+    //it 
     for (int i = 0; i < testRounds; i++)
     {
-        string testMessage;
-        unsigned messageRoundSize;
-        unsigned messageRoundOffset;
+        string testMessage;                //this holds a substring of the message to be tested on
+        unsigned messageRoundSize;         //how big the message will be this round of testing
+        unsigned messageRoundOffset;       //the offset from the begining of the message to start grabbing a substring
+
+        //randomly grab a sub-string and check it's not outof bounds
         do{
             messageRoundSize = (rand() % PLAINTEXTREADSIZE) ;
             messageRoundOffset = (rand() % PLAINTEXTREADSIZE) ;
         }while (!messageRoundSize && messageRoundOffset + messageRoundSize >= msg.size());
-            
+
+        //make a copy of the sub-string so we can text on it            
         for(int i =0; i < messageRoundSize; i ++){
             testMessage.append(1,msg[i+messageRoundOffset]);
         }
-        msgBase10 = convertCharsToBigUnsigned(testMessage);
+        msgBase10 = convertCharsToBigUnsigned(testMessage);//RSA is done on numbers, so convert the charater into a useful base 10 BigUnsigned
 
-        preLoadedCipher = RSA.encryptBlock(msgBase10); // we want to remove memory allocation time from the test
+        //report incremental progress of testing
         unsigned reportAfterRound = testRounds/10;
         if (!(i%reportAfterRound))
         {
-            //
             cout << "timer since start [ " << totalTime.elapsed() << " ] on test round [ " << i << endl;
         }
 
+        //measure encryption times
         clock.reset();
         RSA.encryptBlock(msgBase10);
         encryptionTime = clock.elapsed();
 
+        //measure decryption times
+        preLoadedCipher = RSA.encryptBlock(msgBase10); // we want to remove memory allocation time from the test
         clock.reset();
         RSA.decryptBlock(preLoadedCipher);
         decryptionTime = clock.elapsed();
 
-        /*
-        outFile << getLengthInBits(RSA.getP()) << ", " << getLengthInBits(RSA.getQ()) << ", ";
-        outFile << getLengthInBits(RSA.getn()) << ", " << getLengthInBits(RSA.getphin()) << ",";
-        */
-
+        //write result to file
         outFile << testMessage.size() << ", " << encryptionTime << ", " << decryptionTime << endl;
     }
     outFile.close();
@@ -505,37 +409,39 @@ void testMessageLengthTiming(vector<char> message, vector<BigUnsigned> primes){
 
 //
 void testPrimeLengthTiming(vector<char> message, vector<BigUnsigned>primes){
-    int testRounds = 2500;
-    int seed = 665;
+    int testRounds = 30;                                  //amount of rounds to test
+    int seed = 665;                                       //seed to randomly repeat the test
     srand(seed);
-    string msg;
-    const string filename= "testPrimeLengthTiming.csv";
-    ofstream outFile(filename);
-    RSAConxtext RSA;
-    BigUnsigned msgBase10;
-    Timer clock;
-    Timer totalTime;
+    string msg;                                           //input message represented as a string data type
+    const string filename= "testPrimeLengthTiming.csv";   //file to write results to
+    ofstream outFile(filename);                           //out stream of file
+    RSAConxtext RSA;                                      //context  of information to do RSA
+    BigUnsigned msgBase10;                                //a base 10 representation of the message
+    Timer clock;                                          //a timer object to measure
+    Timer totalTime;                                      // timer object to measure total time for personal use
     totalTime.reset();
 
-    double encryptionTime;
-    double decryptionTime;
-    BigUnsigned preLoadedCipher;
+    double encryptionTime;                                //time in seconds it took to encrypt
+    double decryptionTime;                                //time in seconds it took to decrypt
+    BigUnsigned preLoadedCipher;                          //a place to hold a ciphertext (inbase 10) to eliminate measuring memory allocation time
+
+
+    //read a single plaintext block into msg to test on.
     for(int i =0; i< PLAINTEXTREADSIZE; i++){
         msg.append(1,message[i]);
         
     }
+    cout <<" begining prime length testing " << endl << endl;
 
     cout << "message to encrypt [ " << msg << endl;
     
     msgBase10 = convertCharsToBigUnsigned(msg);
 
-
-    cout << "testing prime length timing "<< endl;
     cout << "doing [ " << testRounds << " ] rounds" << endl;
     cout << "using random seed [ " << seed << endl;
     cout << "setting fileheader" << endl;
 
-
+    //write the csv cell header
     outFile << "message length (char), " << msg.size() <<endl;
     outFile << "random seed used, " << seed << endl;
     outFile << "prime one length (bin digits), prime two length (bin digits), ";
@@ -547,37 +453,28 @@ void testPrimeLengthTiming(vector<char> message, vector<BigUnsigned>primes){
     for (int i = 0; i < testRounds; i++)
     {
 
-        while (!RSA.setP(primes.at(rand() % primes.size())))
-            ; // nop to keep drawing
-
-        while (!RSA.setQ(primes.at(rand() % primes.size())))
-            ; // nop to keep drawing
-
-        BigUnsigned e;
-        do
-        {
-            // cout << "setting e" << endl;
-            e = (unsigned)rand() | 3;
-        } while (!RSA.sete(e));
-
-        // RSA.printContext();
+        RSA = select_P_Q_E(primes);
 
         preLoadedCipher = RSA.encryptBlock(msgBase10); // we want to remove memory allocation time from the test
+        
+        //report incrementially though the testing
         unsigned reportAfterRound = testRounds/10;
         if (!(i%reportAfterRound))
         {
-            //
             cout << "timer since start [ " << totalTime.elapsed() << " ] on test round [ " << i << endl;
         }
 
+        //test encryption
         clock.reset();
         RSA.encryptBlock(msgBase10);
         encryptionTime = clock.elapsed();
 
+        //test decryption
         clock.reset();
         RSA.decryptBlock(preLoadedCipher);
         decryptionTime = clock.elapsed();
 
+        //store results
         outFile << getLengthInBits(RSA.getP()) << ", " << getLengthInBits(RSA.getQ()) << ", ";
         outFile << getLengthInBits(RSA.getn()) << ", " << getLengthInBits(RSA.getphin()) << ",";
         outFile << encryptionTime << ", " << decryptionTime << endl;
@@ -591,21 +488,3 @@ void testPrimeLengthTiming(vector<char> message, vector<BigUnsigned>primes){
     return;
 
 }
-
-
-/* vectors have strange copy constructor functionality. The 2nd loop throws a bad alloc.
-// returns the block at i, seperated by blockSize
-vector<char> getBlockAt(vector<char> text, int index, int blockSize)
-{
-    if(text.size() < (index+1) *blockSize){
-        cout << "getBlockAt is trying to go out of bounds, throwing error " << endl;
-        throw "getBlockAt is trying to go out of bounds, throwing error ";
-    }
-    
-    vector<char> block;
-
-
-    cout << "plain block [ " << endl << endl << to_string(block) << endl << endl;
-    cout << "////////////////////////////////////////////////////////////////////////////" << endl;
-}; 
-*/
