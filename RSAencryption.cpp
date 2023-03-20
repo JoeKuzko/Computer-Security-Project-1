@@ -36,6 +36,7 @@ BigUnsigned         convertCharsToBigUnsigned(string input);//helper funcion to 
 string              convertBigUnsignedToBase256(BigUnsigned);
 void                testPrimeLengthTiming(vector<char>, vector<BigUnsigned> Primes);
 void                testMessageLengthTiming(vector<char>, vector<BigUnsigned> Primes);
+void                testKeyLengthTiming(vector<char> message, vector<BigUnsigned>primes);
 
 string inline       to_string(vector<char> msg){ string m; for(int i =0; i < msg.size(); i++) m.append(1,msg[i]); return m;}//inline function to convert a char vector and returns a string
     
@@ -64,6 +65,7 @@ int main(){
     
     testPrimeLengthTiming(plaintext, primes);//runs test suite for prime length timing
     testMessageLengthTiming(plaintext, primes);//runs test suite for message length timing
+    testKeyLengthTiming(plaintext, primes);
 
     return 0;
 }
@@ -475,6 +477,100 @@ void testPrimeLengthTiming(vector<char> message, vector<BigUnsigned>primes){
         decryptionTime = clock.elapsed();
 
         //store results
+        outFile << getLengthInBits(RSA.getP()) << ", " << getLengthInBits(RSA.getQ()) << ", ";
+        outFile << getLengthInBits(RSA.getn()) << ", " << getLengthInBits(RSA.getphin()) << ",";
+        outFile << encryptionTime << ", " << decryptionTime << endl;
+    }
+    outFile.close();
+
+    cout << "testing done. " << endl;
+    cout << "total elapsed time [ " << totalTime.elapsed() << endl;
+    cout << "results located in " << filename << endl;
+
+    return;
+
+}
+
+
+void testKeyLengthTiming(vector<char> message, vector<BigUnsigned>primes){
+    int testRounds = 300;                                  //amount of rounds to test
+    int seed = 665;                                       //seed to randomly repeat the test
+    srand(seed);
+    string msg;                                           //input message represented as a string data type
+    const string filename= "testKeyLengthTiming.csv";   //file to write results to
+    ofstream outFile(filename);                           //out stream of file
+    RSAConxtext RSA;                                      //context  of information to do RSA
+    BigUnsigned msgBase10;                                //a base 10 representation of the message
+    Timer clock;                                          //a timer object to measure
+    Timer totalTime;                                      // timer object to measure total time for personal use
+    totalTime.reset();
+
+    double encryptionTime;                                //time in seconds it took to encrypt
+    double decryptionTime;                                //time in seconds it took to decrypt
+    BigUnsigned preLoadedCipher;                          //a place to hold a ciphertext (inbase 10) to eliminate measuring memory allocation time
+
+
+    //read a single plaintext block into msg to test on.
+    for(int i =0; i< PLAINTEXTREADSIZE; i++){
+        msg.append(1,message[i]);
+        
+    }
+    cout <<" begining key length testing " << endl << endl;
+
+    //cout << "message to encrypt [ " << msg << endl;
+    
+    msgBase10 = convertCharsToBigUnsigned(msg);
+
+    cout << "doing [ " << testRounds << " ] rounds" << endl;
+    cout << "using random seed [ " << seed << endl;
+    cout << "setting fileheader" << endl;
+
+    //write the csv cell header
+    outFile << "message length (char), " << msg.size() <<endl;
+    outFile << "message length (char), " << msg.size() <<endl;
+    outFile << "random seed used, " << seed << endl;
+    outFile << "e key length (bin digits), " << "d key length (bin digits), ";
+    outFile << "prime one length (bin digits), prime two length (bin digits), ";
+    outFile << "modulus - n length (bin Digits, phi(n) length (bin digits), ";
+    outFile << "encryption time (seconds), decryption time (seconds)" << endl;
+
+    
+    //keep p and q constant. E changes
+    RSA = select_P_Q_E(primes);
+
+    for (int i = 0; i < testRounds; i++)
+    {
+        int roll = (rand()%200) + 2;
+        
+        BigUnsigned e;
+        do{
+        e=0;
+        for (int i =0; i < roll; i++){
+            e = (e << 1) | (rand()&1);
+        }
+        }while(!RSA.sete(e));
+
+        preLoadedCipher = RSA.encryptBlock(msgBase10); // we want to remove memory allocation time from the test
+        
+        //report incrementially though the testing
+        unsigned reportAfterRound = testRounds/10;
+        if (!(i%reportAfterRound))
+        {
+            cout << "timer since start [ " << totalTime.elapsed() << " ] on test round [ " << i << endl;
+        }
+
+        //test encryption
+        clock.reset();
+        RSA.encryptBlock(msgBase10);
+        encryptionTime = clock.elapsed();
+
+        //test decryption
+        clock.reset();
+        RSA.decryptBlock(preLoadedCipher);
+        decryptionTime = clock.elapsed();
+
+        //store results
+        outFile << getLengthInBits(RSA.gete()) << ", " << getLengthInBits(RSA.getd()) << ", "; 
         outFile << getLengthInBits(RSA.getP()) << ", " << getLengthInBits(RSA.getQ()) << ", ";
         outFile << getLengthInBits(RSA.getn()) << ", " << getLengthInBits(RSA.getphin()) << ",";
         outFile << encryptionTime << ", " << decryptionTime << endl;
