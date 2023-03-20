@@ -1,4 +1,10 @@
-all: RSAencryption 
+all: RSAencryption PrimeGeneration
+
+
+#program to create primes
+#to-do add BigIntLib makefile dependency
+PrimeGeneration:
+	g++ -std=c++11 -w -Wall PrimeGeneration.cc BigInteger.o BigIntegerAlgorithms.o BigIntegerUtils.o BigUnsigned.o BigUnsignedInABase.o -o PrimeGeneration
 
 
 #RSAencryption is the program to encrpyt / decrypt primes.
